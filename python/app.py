@@ -15,7 +15,11 @@ from db.conmgr import getinstance
 from db.conmgr_mongo import connectmongo
 from utils.pdftoimage import converttoimage
 from utils.imagetotext import convertimagetotext
+from utils.imagetoalto import convertimagetoalto
 from utils.puttext import puttext
+from utils.removetextv2 import removetext
+from utils.imagetopdf import converttopdf
+from utils.translateandupdateimage import translateandupdateimage
 # from utils.imagetotext_v2 import convertimagetotextv2
 from utils.process_paragraph import processhindi
 from utils.process_paragraph_eng import processenglish
@@ -37,9 +41,11 @@ import multiprocessing as mp
 import codecs
 from flask_cors import CORS
 from flask import Response
+import flask as flask
 from models.status import Status
 from models.response import CustomResponse
-
+import utils.docx_translate_helper as docx_helper
+import uuid
 app = Flask(__name__)
 app.debug = True
 CORS(app)
@@ -52,6 +58,12 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 es = getinstance()
 words = []
 connectmongo()
+
+
+@app.route('/hello', methods=['GET'])
+def hello_():
+   
+    return "hello"
 
 
 @app.route('/fetch-corpus', methods=['GET'])
@@ -97,74 +109,74 @@ def translateFile():
     translationProcess.save()
     f.save(filepath)
     pool.apply_async(converttoimage, args=(
-        filepath, app.config['UPLOAD_FOLDER'], basename, '_hin'), callback=capturetext)
+        filepath, app.config['UPLOAD_FOLDER'], basename, ''), callback=capturealtotext)
     pool.close()
     pool.join()
-    filtertext(app.config['UPLOAD_FOLDER'] + '/'+basename+'_hin.txt',
-               app.config['UPLOAD_FOLDER'] + '/'+basename+'_hin_filtered.txt')
-    processenglish(app.config['UPLOAD_FOLDER'] +
-                 '/'+basename+'_hin_filtered.txt')
-    translatewithanuvadaeng(app.config['UPLOAD_FOLDER'] +
-                         '/'+basename+'_hin_filtered.txt', app.config['UPLOAD_FOLDER'] +
-                         '/'+basename+'_eng_tran.txt')
-    f_eng = open(app.config['UPLOAD_FOLDER']+'/' +
-                 basename + '_eng_tran.txt', 'r')
-    english_res = []
-    hindi_res = []
-    for f in f_eng:
-        english_res.append(f)
-    f_eng.close()
-    f_hin = open(app.config['UPLOAD_FOLDER']+'/' +
-                 basename + '_hin_filtered.txt', 'r')
-    index = 0
-    previousY = 0
-    previousX = 0
-    previousH = 0
-    previousP = ''
-    text_y = {}
-    text_x = 0
-    for f in f_hin:
-        hindi_res.append(f)
-        print(f)
-        point = fetchwordhocrfromsentence(f, basename)
-        english = english_res[index]
-        words = english.split(' ')
-        wordIndex = 0
+    # filtertext(app.config['UPLOAD_FOLDER'] + '/'+basename+'_hin.txt',
+    #            app.config['UPLOAD_FOLDER'] + '/'+basename+'_hin_filtered.txt')
+    # processenglish(app.config['UPLOAD_FOLDER'] +
+    #              '/'+basename+'_hin_filtered.txt')
+    # translatewithanuvadaeng(app.config['UPLOAD_FOLDER'] +
+    #                      '/'+basename+'_hin_filtered.txt', app.config['UPLOAD_FOLDER'] +
+    #                      '/'+basename+'_eng_tran.txt')
+    # f_eng = open(app.config['UPLOAD_FOLDER']+'/' +
+    #              basename + '_eng_tran.txt', 'r')
+    # english_res = []
+    # hindi_res = []
+    # for f in f_eng:
+    #     english_res.append(f)
+    # f_eng.close()
+    # f_hin = open(app.config['UPLOAD_FOLDER']+'/' +
+    #              basename + '_hin_filtered.txt', 'r')
+    # index = 0
+    # previousY = 0
+    # previousX = 0
+    # previousH = 0
+    # previousP = ''
+    # text_y = {}
+    # text_x = 0
+    # for f in f_hin:
+    #     hindi_res.append(f)
+    #     print(f)
+    #     point = fetchwordhocrfromsentence(f, basename)
+    #     english = english_res[index]
+    #     words = english.split(' ')
+    #     wordIndex = 0
         
-        for word in words:
-            try:
-                if point['values'] is not None and point['values'][wordIndex] is not None and point['values'][wordIndex]['height'] is not None:
-                    previousY = point['values'][wordIndex]['left']
-                    previousX = point['values'][wordIndex]['top']
-                    previousH = point['values'][wordIndex]['height']
-                    try:
-                        if text_y[point['values'][wordIndex]['imagepath']] is None:
-                            text_y[point['values'][wordIndex]['imagepath']] = 200
-                    except Exception as e:
-                        text_y[point['values'][wordIndex]['imagepath']] = 200
-                    (text_x, vertical) = puttext(point['values'][wordIndex]['height'],200,text_y[point['values'][wordIndex]['imagepath']],english,point['values'][wordIndex]['imagepath'])
-                    text_y[point['values'][wordIndex]['imagepath']] = vertical
-                    # else:
-                    #     (text_x, text_y) = puttext(point['values'][wordIndex]['height'],point['values'][wordIndex]['left'],point['values'][wordIndex]['top'],english,point['values'][wordIndex]['imagepath'])
-                    previousP = point['values'][wordIndex]['imagepath']
-                    break
-            except Exception as e:
-                previousY = previousY + 200
-                # puttext(previousH,previousY,previousX,word,previousP)
-            wordIndex = wordIndex + 1
-            # puttext(point['values'][wordIndex]['left'],point['values'][wordIndex]['top'],word,point['values'][wordIndex]['imagepath'])
-        index = index + 1
-    f_hin.close()
-    data = {'hindi': hindi_res, 'english': english_res}
-    translations = []
-    for i in range(0, len(hindi_res)):
-        translation = Translation(basename=str(
-            basename), source=hindi_res[i], target=english_res[i])
-        translations.append(translation)
-    Translation.objects.insert(translations)
-    # for f in glob.glob(app.config['UPLOAD_FOLDER']+'/'+basename+'*'):
-    #     os.remove(f)
-    res = CustomResponse(Status.SUCCESS.value, data)
+    #     for word in words:
+    #         try:
+    #             if point['values'] is not None and point['values'][wordIndex] is not None and point['values'][wordIndex]['height'] is not None:
+    #                 previousY = point['values'][wordIndex]['left']
+    #                 previousX = point['values'][wordIndex]['top']
+    #                 previousH = point['values'][wordIndex]['height']
+    #                 try:
+    #                     if text_y[point['values'][wordIndex]['imagepath']] is None:
+    #                         text_y[point['values'][wordIndex]['imagepath']] = 200
+    #                 except Exception as e:
+    #                     text_y[point['values'][wordIndex]['imagepath']] = 200
+    #                 (text_x, vertical) = puttext(point['values'][wordIndex]['height'],200,text_y[point['values'][wordIndex]['imagepath']],english,point['values'][wordIndex]['imagepath'])
+    #                 text_y[point['values'][wordIndex]['imagepath']] = vertical
+    #                 # else:
+    #                 #     (text_x, text_y) = puttext(point['values'][wordIndex]['height'],point['values'][wordIndex]['left'],point['values'][wordIndex]['top'],english,point['values'][wordIndex]['imagepath'])
+    #                 previousP = point['values'][wordIndex]['imagepath']
+    #                 break
+    #         except Exception as e:
+    #             previousY = previousY + 200
+    #             # puttext(previousH,previousY,previousX,word,previousP)
+    #         wordIndex = wordIndex + 1
+    #         # puttext(point['values'][wordIndex]['left'],point['values'][wordIndex]['top'],word,point['values'][wordIndex]['imagepath'])
+    #     index = index + 1
+    # f_hin.close()
+    # data = {'hindi': hindi_res, 'english': english_res}
+    # translations = []
+    # for i in range(0, len(hindi_res)):
+    #     translation = Translation(basename=str(
+    #         basename), source=hindi_res[i], target=english_res[i])
+    #     translations.append(translation)
+    # Translation.objects.insert(translations)
+    # # for f in glob.glob(app.config['UPLOAD_FOLDER']+'/'+basename+'*'):
+    # #     os.remove(f)
+    res = CustomResponse(Status.SUCCESS.value, '')
     translationProcess = TranslationProcess.objects(basename=basename)
     translationProcess.update(set__status=STATUS_PROCESSED)
     return res.getres()
@@ -219,6 +231,53 @@ def translate():
     translationProcess.update(set__status=STATUS_PROCESSED)
     return res.getres()
 
+@app.route('/download-docx', methods=['GET'])
+def downloadDocx():
+    filename = request.args.get('filename')
+    return flask.send_file('upload/'+filename,attachment_filename='filename')
+
+
+
+@app.route('/translate-docx', methods=['POST'])
+def translateDocx():
+    pool = mp.Pool(mp.cpu_count())
+    basename = str(int(time.time()))
+    current_time = datetime.now().strftime("%m/%d/%Y, %H:%M:%S")
+    f = request.files['file']
+    filepath = os.path.join(
+        app.config['UPLOAD_FOLDER'], basename + '.docx')
+    translationProcess = TranslationProcess(
+        status=STATUS_PROCESSING, name=f.filename, created_on=current_time, basename=basename)
+    translationProcess.save()
+    f.save(filepath)
+    filename_to_processed = f.filename
+    filepath_processed = os.path.join(
+        app.config['UPLOAD_FOLDER'], basename +'_t'+'.docx')
+
+    print(filename_to_processed)    
+
+    xml_content = docx_helper.get_document_xml(filepath)
+    xmltree     = docx_helper.get_xml_tree(xml_content)
+
+    nodes = []
+    texts = []
+    for node, text in docx_helper.itertext(xmltree):
+        nodes.append(node)
+        texts.append(text)
+
+    print('number of nodes'+ str(len(nodes)) +'and text are: '+ str(len(texts)))
+
+    docx_helper.add_identification_tag(xmltree, str(uuid.uuid4()))
+    docx_helper.modify_text(xmltree)
+#modify_text_(xmltree_endnote)
+    docx_helper.save_docx(filepath, xmltree, filepath_processed)
+
+
+    
+    res = CustomResponse(Status.SUCCESS.value,basename +'_t'+'.docx')
+    translationProcess = TranslationProcess.objects(basename=basename)
+    translationProcess.update(set__status=STATUS_PROCESSED)
+    return res.getres()
 
 @app.route('/single', methods=['POST'])
 def upload_single_file():
@@ -343,6 +402,16 @@ def capturetext(result):
     words = convertimagetotext(result['imagenames'], app.config['UPLOAD_FOLDER'] +
                                '/' + result['basename'] + result['suffix'] + '.txt', result['basename'])
     savewords(words)
+
+def capturealtotext(result):
+    convertimagetoalto(result['imagenames'], app.config['UPLOAD_FOLDER'] +
+                               '/' + result['basename'] + result['suffix'], result['basename'])
+    removetext(result['imagenames'], app.config['UPLOAD_FOLDER'] +
+                               '/' + result['basename'] + result['suffix'])
+    translateandupdateimage(result['imagenames'], app.config['UPLOAD_FOLDER'] +
+                               '/' + result['basename'] + result['suffix'])
+    converttopdf(result['imagenames'])
+
 
 
 
