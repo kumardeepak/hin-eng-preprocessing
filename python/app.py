@@ -6,6 +6,7 @@
  * @desc [description]
  """
 from flask import Flask, jsonify, request
+from werkzeug.utils import safe_join
 import os
 import glob
 import sys
@@ -62,7 +63,7 @@ connectmongo()
 
 @app.route('/hello', methods=['GET'])
 def hello_():
-   
+
     return "hello"
 
 
@@ -142,7 +143,7 @@ def translateFile():
     #     english = english_res[index]
     #     words = english.split(' ')
     #     wordIndex = 0
-        
+
     #     for word in words:
     #         try:
     #             if point['values'] is not None and point['values'][wordIndex] is not None and point['values'][wordIndex]['height'] is not None:
@@ -201,10 +202,10 @@ def translate():
     filtertext(app.config['UPLOAD_FOLDER'] + '/'+basename+'_hin.txt',
                app.config['UPLOAD_FOLDER'] + '/'+basename+'_hin_filtered.txt')
     processenglish(app.config['UPLOAD_FOLDER'] +
-                 '/'+basename+'_hin_filtered.txt')
+                   '/'+basename+'_hin_filtered.txt')
     translatewithanuvadaeng(app.config['UPLOAD_FOLDER'] +
-                         '/'+basename+'_hin_filtered.txt', app.config['UPLOAD_FOLDER'] +
-                         '/'+basename+'_eng_tran.txt')
+                            '/'+basename+'_hin_filtered.txt', app.config['UPLOAD_FOLDER'] +
+                            '/'+basename+'_eng_tran.txt')
     f_eng = open(app.config['UPLOAD_FOLDER']+'/' +
                  basename + '_eng_tran.txt', 'r')
     english_res = []
@@ -231,11 +232,11 @@ def translate():
     translationProcess.update(set__status=STATUS_PROCESSED)
     return res.getres()
 
+
 @app.route('/download-docx', methods=['GET'])
 def downloadDocx():
     filename = request.args.get('filename')
-    return flask.send_file('upload/'+filename,attachment_filename='filename')
-
+    return flask.send_file(safe_join('upload/', filename), attachment_filename='filename')
 
 
 @app.route('/translate-docx', methods=['POST'])
@@ -252,12 +253,12 @@ def translateDocx():
     f.save(filepath)
     filename_to_processed = f.filename
     filepath_processed = os.path.join(
-        app.config['UPLOAD_FOLDER'], basename +'_t'+'.docx')
+        app.config['UPLOAD_FOLDER'], basename + '_t'+'.docx')
 
-    print(filename_to_processed)    
+    print(filename_to_processed)
 
     xml_content = docx_helper.get_document_xml(filepath)
-    xmltree     = docx_helper.get_xml_tree(xml_content)
+    xmltree = docx_helper.get_xml_tree(xml_content)
 
     nodes = []
     texts = []
@@ -265,19 +266,19 @@ def translateDocx():
         nodes.append(node)
         texts.append(text)
 
-    print('number of nodes'+ str(len(nodes)) +'and text are: '+ str(len(texts)))
+    print('number of nodes' + str(len(nodes)) +
+          'and text are: ' + str(len(texts)))
 
     docx_helper.add_identification_tag(xmltree, str(uuid.uuid4()))
     docx_helper.modify_text(xmltree)
-#modify_text_(xmltree_endnote)
+# modify_text_(xmltree_endnote)
     docx_helper.save_docx(filepath, xmltree, filepath_processed)
 
-
-    
-    res = CustomResponse(Status.SUCCESS.value,basename +'_t'+'.docx')
+    res = CustomResponse(Status.SUCCESS.value, basename + '_t'+'.docx')
     translationProcess = TranslationProcess.objects(basename=basename)
     translationProcess.update(set__status=STATUS_PROCESSED)
     return res.getres()
+
 
 @app.route('/single', methods=['POST'])
 def upload_single_file():
@@ -403,13 +404,14 @@ def capturetext(result):
                                '/' + result['basename'] + result['suffix'] + '.txt', result['basename'])
     savewords(words)
 
+
 def capturealtotext(result):
     convertimagetoalto(result['imagenames'], app.config['UPLOAD_FOLDER'] +
-                               '/' + result['basename'] + result['suffix'], result['basename'])
+                       '/' + result['basename'] + result['suffix'], result['basename'])
     removetext(result['imagenames'], app.config['UPLOAD_FOLDER'] +
-                               '/' + result['basename'] + result['suffix'])
+               '/' + result['basename'] + result['suffix'])
     translateandupdateimage(result['imagenames'], app.config['UPLOAD_FOLDER'] +
-                               '/' + result['basename'] + result['suffix'])
+                            '/' + result['basename'] + result['suffix'])
     converttopdf(result['imagenames'])
 
 
